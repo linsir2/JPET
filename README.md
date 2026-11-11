@@ -44,11 +44,21 @@ docker compose -f deploy/docker-compose.yml up -d
 - Nacos：`127.0.0.1:8848`，控制台 `http://localhost:8088`
 - 首次启动会执行 `db/init/*.sql` 创建 `user_db` 与 `commerce_db`
 
+> 如果 Docker Hub 拉取超时，可先拉国内镜像再 retag：
+>
+> ```bash
+> docker pull docker.m.daocloud.io/nacos/nacos-server:v3.1.2-slim
+> docker tag docker.m.daocloud.io/nacos/nacos-server:v3.1.2-slim nacos/nacos-server:v3.1.2
+> docker pull mysql:8.0
+> ```
+
 ### 4. 启动四个服务
 
 ```bash
 scripts/start-all.sh
 ```
+
+> `start-all.sh` 使用 `tmux`；没有安装 tmux 时，直接用下面的 `java -jar` 命令逐个启动即可。
 
 或手动：
 

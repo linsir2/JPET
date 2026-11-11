@@ -1,0 +1,524 @@
+openapi: 3.0.3
+info:
+  title: Pet Shop Backend Merchant API
+  version: 1.0.0
+  description: |
+    商家侧接口文档，覆盖商家入驻申请与商家资料展示/修改能力。
+
+    统一响应约定：
+    1. 所有接口统一返回 `code`、`message`、`data`、`metadata` 四个字段。
+    2. 成功时默认 `code=200`，未显式自定义时 `message=Success`。
+    3. 当前工程启用了 Jackson `snake_case`，因此正常请求体与成功响应体字段使用下划线命名。
+    4. 参数校验失败和部分业务异常中的 `data` 为后端 `Map<String, Object>`，其 key 保持服务端原始字段名，不额外转为 `snake_case`。
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+tags:
+  - name: Merchant Onboarding
+    description: 商家入驻申请接口
+  - name: Merchant Profile
+    description: 商家资料展示与修改接口
+paths:
+  /api/merchant/apply:
+    post:
+      tags:
+        - Merchant Onboarding
+      summary: 提交商家入驻申请
+      operationId: applyMerchant
+      description: |
+        登录后提交商家入驻申请。
+
+        规则说明：
+        1. 该接口要求携带商家侧 access token。
+        2. 当前安全配置允许 `normal_user` 与 `merchant_user` 访问该接口，但通常由尚未完成入驻的普通用户发起。
+        3. 若当前账号已有待审核申请、已完成入驻或商家状态异常，服务端会拒绝重复申请。
+        4. `merchant_name` 必须唯一；`tags` 中空白项会被自动忽略，重复项会被去重。
+        5. 提交申请时会同步记录联系邮箱与联系方式，供管理员审核时核对。
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantApplyRequest'
+            examples:
+              default:
+                summary: 商家入驻申请示例
+                value:
+                  merchant_name: 汪喵优选旗舰店
+                  email: store@example.com
+                  phone: 13800138000
+                  image_url: https://cdn.example.com/merchant/store-1.jpg
+                  description: |-
+                    专注猫狗主粮与日用用品。
+                    支持全国配送。
+                  tags:
+                    - 狗粮
+                    - 猫粮
+                    - 逗猫棒
+      responses:
+        '200':
+          description: 申请提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultMerchantApply'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: 商家入驻申请已提交
+                    data:
+                      merchant_id: 1001
+                      status: pending
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          description: 账号状态异常或无权提交申请
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                accountStatusInvalid:
+                  value:
+                    code: 403
+                    message: 当前账号状态异常，无法提交商家申请
+                    data:
+                      subjectType: user
+                      subjectId: 88
+                      status: banned
+                      errorType: ACCOUNT_STATUS_INVALID
+                    metadata: {}
+        '409':
+          description: 商家申请冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                duplicateApply:
+                  value:
+                    code: 409
+                    message: 当前账号已经提交过商家申请，请等待管理员审核
+                    data:
+                      userId: 88
+                      status: pending
+                      errorType: MERCHANT_APPLY_CONFLICT
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /api/merchant/profile:
+    get:
+      tags:
+        - Merchant Profile
+      summary: 获取当前商家资料
+      operationId: getMerchantProfile
+      description: |
+        获取当前登录商家的资料信息。
+
+        返回内容覆盖 PRD 中要求的展示字段：
+        1. 商家图片、商家名称、登录用户名。
+        2. 注册日期与营业天数。
+        3. 根据已完成订单统计的营业额。
+        4. 商家简介、商家认证、商家标签。
+
+        访问要求：
+        1. 必须携带商家用户的 access token。
+        2. 当前商家记录状态必须为 `active`，否则接口返回 403。
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultMerchantProfile'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      image_url: https://cdn.example.com/merchant/store-1.jpg
+                      merchant_name: 汪喵优选旗舰店
+                      username: pet_owner_88
+                      registration_date: '2026-03-01'
+                      registration_duration_days: 46
+                      registration_duration_text: 已营业 46 天
+                      turnover_from_completed_orders: 5230.50
+                      description: |-
+                        专注猫狗主粮与日用用品。
+                        支持全国配送。
+                      authentications:
+                        - 官方店认证
+                        - 营业执照认证
+                      tags:
+                        - 狗粮
+                        - 猫粮
+                        - 逗猫棒
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          description: 当前商家状态异常
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                merchantStatusInvalid:
+                  value:
+                    code: 403
+                    message: 当前商家状态异常，无法访问商家资料
+                    data:
+                      subjectType: merchant
+                      subjectId: 1001
+                      status: banned
+                      errorType: ACCOUNT_STATUS_INVALID
+                    metadata: {}
+                merchantNotFound:
+                  value:
+                    code: 403
+                    message: 当前用户尚未完成商家认证或商家信息不存在
+                    data:
+                      userId: 88
+                      errorType: MERCHANT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+    put:
+      tags:
+        - Merchant Profile
+      summary: 修改当前商家资料
+      operationId: updateMerchantProfile
+      description: |
+        修改当前登录商家的资料信息。
+
+        字段语义：
+        1. 请求体字段为 `null` 表示不修改该项。
+        2. `tags` 传空数组表示清空全部标签，传 `null` 表示不修改标签。
+        3. `description` 传空字符串会被视为清空商家简介。
+        4. `merchant_name` 若发生变更，受“每自然月仅可修改一次”限制。
+        5. `description` 仅允许纯文字，可包含空格与换行，但不允许尖括号等标记。
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantProfileUpdateRequest'
+            examples:
+              updateAll:
+                summary: 修改多项资料
+                value:
+                  image_url: https://cdn.example.com/merchant/store-1-new.jpg
+                  merchant_name: 汪喵优选官方店
+                  description: |-
+                    专注猫狗主粮与日用用品。
+                    新增冻干零食专区。
+                  tags:
+                    - 狗粮
+                    - 猫粮
+                    - 冻干
+              clearTags:
+                summary: 清空全部标签
+                value:
+                  tags: []
+      responses:
+        '200':
+          description: 修改成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultMerchantProfile'
+        '400':
+          description: 参数校验失败或业务规则校验失败
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/BusinessErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      merchantName: 商家名称长度不能超过 100 个字符
+                    metadata: {}
+                nameTooFrequent:
+                  value:
+                    code: 400
+                    message: 商家名称每自然月仅可修改一次，请稍后再试
+                descriptionInvalid:
+                  value:
+                    code: 400
+                    message: 商家简介仅允许纯文字，不能包含尖括号等标记
+        '401':
+          $ref: '#/components/responses/UnauthorizedResponse'
+        '403':
+          description: 当前商家状态异常或当前用户无有效商家记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+        '409':
+          description: 商家名称冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessErrorResult'
+              examples:
+                duplicateMerchantName:
+                  value:
+                    code: 409
+                    message: 该商家名称已被占用
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ValidationErrorResponse:
+      description: 参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResult'
+          examples:
+            invalid:
+              value:
+                code: 400
+                message: 参数校验失败
+                data:
+                  merchantName: 商家名称长度不能超过 100 个字符
+                metadata: {}
+
+    UnauthorizedResponse:
+      description: 未登录或登录凭证无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BusinessErrorResult'
+          examples:
+            unauthorized:
+              value:
+                code: 401
+                message: 未登录或登录已失效
+
+    SystemErrorResponse:
+      description: 系统异常
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BusinessErrorResult'
+          examples:
+            systemError:
+              value:
+                code: 500
+                message: 系统异常：xxx
+
+  schemas:
+    MerchantApplyRequest:
+      type: object
+      required:
+        - merchant_name
+        - email
+        - phone
+        - image_url
+      properties:
+        merchant_name:
+          type: string
+          maxLength: 100
+          description: 商家名称
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          description: 商家联系邮箱
+        phone:
+          type: string
+          maxLength: 30
+          description: 商家联系方式
+        image_url:
+          type: string
+          maxLength: 500
+          description: 商家图片 URL
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: 商家简介，仅允许纯文字
+        tags:
+          type: array
+          nullable: true
+          items:
+            type: string
+            maxLength: 50
+          maxItems: 30
+          description: 商家标签列表
+
+    MerchantProfileUpdateRequest:
+      type: object
+      description: 所有字段均可选；字段缺省表示不修改
+      properties:
+        image_url:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: 商家图片 URL；传空字符串会被判定为非法
+        merchant_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: 商家名称；每自然月最多修改一次
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: 商家简介；传空字符串表示清空
+        tags:
+          type: array
+          nullable: true
+          maxItems: 30
+          description: 传 null 表示不修改，传空数组表示清空全部标签
+          items:
+            type: string
+            maxLength: 50
+
+    MerchantProfile:
+      type: object
+      properties:
+        image_url:
+          type: string
+          nullable: true
+        merchant_name:
+          type: string
+        username:
+          type: string
+        registration_date:
+          type: string
+          nullable: true
+          example: '2026-03-01'
+        registration_duration_days:
+          type: integer
+          format: int64
+        registration_duration_text:
+          type: string
+        turnover_from_completed_orders:
+          type: number
+          format: double
+        description:
+          type: string
+          nullable: true
+        authentications:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    MerchantApplyData:
+      type: object
+      properties:
+        merchant_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum:
+            - pending
+
+    ResultMerchantApply:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: 商家入驻申请已提交
+        data:
+          $ref: '#/components/schemas/MerchantApplyData'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ResultMerchantProfile:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Success
+        data:
+          $ref: '#/components/schemas/MerchantProfile'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ValidationErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: 参数校验失败
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    BusinessErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+        metadata:
+          type: object
+          nullable: true
+          additionalProperties: true
+
+    AppErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true

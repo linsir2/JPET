@@ -1,0 +1,106 @@
+body.buyer-theme {
+  --font-ui: 'Avenir Next', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --font-display: 'Trebuchet MS', 'Avenir Next', 'PingFang SC', sans-serif;
+  --bg-soft: #fff9f3;
+  --bg-panel: rgba(255, 255, 255, 0.86);
+  --ink-strong: #3d2b2f;
+  --ink-soft: #7f6770;
+  --line-soft: rgba(141, 108, 119, 0.18);
+  --brand-pink: #ff7aa8;
+  --brand-peach: #ffb171;
+  --brand-lemon: #ffd85c;
+  --brand-sky: #7ec8ff;
+  --brand-mint: #8ee6d0;
+  --shadow-soft: 0 24px 60px rgba(174, 106, 126, 0.16);
+  --shadow-card: 0 14px 34px rgba(89, 62, 76, 0.12);
+  --radius-xl: 32px;
+  --radius-lg: 24px;
+  --radius-md: 18px;
+  --radius-sm: 14px;
+  font-family: var(--font-ui);
+  color: var(--ink-strong);
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(circle at top left, rgba(255, 182, 193, 0.24), transparent 28%),
+    radial-gradient(circle at top right, rgba(126, 200, 255, 0.2), transparent 26%),
+    linear-gradient(180deg, #fffaf6 0%, #fff2ea 100%);
+}
+
+body.buyer-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url('/images/背景3.jpg') center / cover no-repeat;
+  opacity: 0.14;
+  z-index: -2;
+}
+
+body.buyer-theme::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 245, 238, 0.9)),
+    linear-gradient(90deg, rgba(255, 122, 168, 0.06), rgba(126, 200, 255, 0.08));
+  z-index: -1;
+}
+
+body.buyer-theme #app {
+  min-height: 100vh;
+}
+/* ====== 增强的高级感公共样式 (Premium UI Utilities) ====== */
+
+/* 磨砂玻璃卡片 */
+body.buyer-theme .glass-panel {
+  background: var(--bg-panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+body.buyer-theme .glass-panel:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-soft);
+}
+
+/* 渐变标题 */
+body.buyer-theme .text-gradient {
+  background: linear-gradient(135deg, var(--brand-pink), var(--brand-peach));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+/* 平滑的交互按钮 */
+body.buyer-theme .btn-premium {
+  background: linear-gradient(135deg, var(--brand-pink), var(--brand-peach));
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 122, 168, 0.2);
+  transition: all 0.3s ease;
+}
+body.buyer-theme .btn-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 122, 168, 0.3);
+}
+body.buyer-theme .btn-premium:active {
+  transform: translateY(0);
+}
+
+/* 强制隐藏默认橙色带来的廉价感 */
+body.buyer-theme .force-premium-theme .el-button--primary {
+  background: var(--brand-pink) !important;
+  border-color: var(--brand-pink) !important;
+}
+body.buyer-theme .force-premium-theme .el-button--primary:hover {
+  background: var(--brand-peach) !important;
+  border-color: var(--brand-peach) !important;
+}
+

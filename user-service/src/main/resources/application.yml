@@ -1,0 +1,58 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: user-service
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3308/user_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:rootpass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    property-naming-strategy: SNAKE_CASE
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            logger-level: full
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+jwt:
+  secret: "${JWT_SECRET:your-256-bit-secret-key-here-must-be-at-least-32-chars}"
+  access-token-expiration-ms: 7200000
+  refresh-token-expiration-ms: 604800000
+
+auth:
+  admin-register:
+    main-admin-key: "${MAIN_ADMIN_KEY:main-admin-123456}"
+    sub-admin-key: "${SUB_ADMIN_KEY:sub-admin-123456}"
+  default-admin:
+    enabled: true
+    account: "admin"
+    password: "${DEFAULT_ADMIN_PASSWORD:Admin123}"
+    role: "main_admin"
+
+app:
+  internal:
+    token: "${INTERNAL_TOKEN:jpet-internal-2026}"
+
+logging:
+  level:
+    com.edu.csu.web.pet_shop_backend.client: DEBUG

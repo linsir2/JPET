@@ -1,0 +1,1356 @@
+openapi: 3.0.3
+info:
+  title: Pet Shop Backend Product API
+  version: 1.0.0
+  description: |
+    商户商品管理接口文档。
+
+    统一响应约定：
+    1. 所有接口均返回统一结构 `code`、`message`、`data`、`metadata`。
+    2. 成功时 `code=200`、`message=Success`。
+    3. `Void` 型成功响应不返回 `data` 字段，仅返回 `code`、`message`、`metadata`。
+    4. DTO/VO 经过 Jackson 的 `snake_case` 命名策略序列化，因此请求体与响应体字段均使用下划线命名。
+    5. 当前工程的安全配置暂时放行所有请求，且参数解析器会注入模拟商户用户；正式接入时应以商户身份调用这些接口。
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+tags:
+  - name: Merchant Products
+    description: 商户端商品管理接口
+paths:
+  /merchant/products:
+    post:
+      tags:
+        - Merchant Products
+      summary: 查询商户商品列表
+      operationId: listMerchantProducts
+      description: |
+        根据分页、状态、标签和关键词查询当前商户的商品列表。
+
+        使用规范：
+        1. 请求体必须为 JSON 对象，字段均可省略；服务端会将非法分页值回退为 `page=1`、`size=10`。
+        2. `status` 支持 `all` 或 SPU 状态枚举值；传空字符串时按 `all` 处理。
+        3. `tags` 中的空白项会被忽略；当前实现对多个标签执行“并集过滤”，只要商品命中任一标签即可被返回。
+        4. `keyword` 同时匹配商品名称和标签名称，前后空白会被自动裁剪。
+        5. 接口面向商户自己的商品数据，调用方不应尝试越权查询其他商户商品。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductListRequest'
+            examples:
+              default:
+                summary: 分页筛选示例
+                value:
+                  page: 1
+                  size: 10
+                  status: published
+                  tags:
+                    - 主粮
+                    - 幼猫
+                  keyword: 益生菌
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultProductList'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      products:
+                        - id: 101
+                          name: 幼猫三文鱼冻干粮
+                          image_url: https://cdn.example.com/products/spu-101.jpg
+                          min_price: 79.90
+                          sales: 152
+                        - id: 102
+                          name: 成猫无谷鸡肉粮
+                          image_url: https://cdn.example.com/products/spu-102.jpg
+                          min_price: 69.00
+                          sales: 89
+                      page_total: 3
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /merchant/products/{id}:
+    get:
+      tags:
+        - Merchant Products
+      summary: 查询商品详情
+      operationId: getMerchantProductDetail
+      description: |
+        查询当前商户名下指定 SPU 的完整详情，包括标签、核心属性和 SKU 列表。
+
+        使用规范：
+        1. `id` 必须为大于 0 的 SPU 主键。
+        2. 仅允许查询当前商户自身的商品；若商品不存在或归属不匹配，返回 404。
+        3. 返回结果中的 `core_attributes` 为空数组表示单品商品；此时 SKU 的 `attribute_values` 应为空对象。
+        4. `sales`、`min_price`、`create_time`、`update_time` 均为只读字段，调用方不得据此反推可写请求字段。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 商品 SPU ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultProductDetail'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      id: 101
+                      name: 幼猫三文鱼冻干粮
+                      description: 高蛋白配方，适合 2-12 月龄幼猫。
+                      image_url: https://cdn.example.com/products/spu-101.jpg
+                      status: published
+                      audit_reason: null
+                      tags:
+                        - 主粮
+                        - 幼猫
+                      min_price: 79.90
+                      sales: 152
+                      core_attributes:
+                        - 规格
+                        - 口味
+                      skus:
+                        - id: 9001
+                          attribute_values:
+                            规格: 1.5kg
+                            口味: 三文鱼
+                          status: available
+                          image_url: https://cdn.example.com/products/sku-9001.jpg
+                          price: 79.90
+                          stock: 48
+                          create_time: '2026-03-20 10:00:00'
+                          update_time: '2026-03-24 09:30:00'
+                        - id: 9002
+                          attribute_values:
+                            规格: 3kg
+                            口味: 三文鱼
+                          status: available
+                          image_url: https://cdn.example.com/products/sku-9002.jpg
+                          price: 139.00
+                          stock: 20
+                          create_time: '2026-03-20 10:00:00'
+                          update_time: '2026-03-24 09:30:00'
+                      create_time: '2026-03-20 10:00:00'
+                      update_time: '2026-03-24 09:30:00'
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '404':
+          description: 商品不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                productNotFound:
+                  value:
+                    code: 404
+                    message: 商品不存在或无权限访问
+                    data:
+                      productId: 101
+                      merchantId: 2001
+                      errorType: PRODUCT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /merchant/products/spu:
+    post:
+      tags:
+        - Merchant Products
+      summary: 创建商品 SPU
+      operationId: createMerchantProduct
+      description: |
+        创建一个新商品，并可在同一请求内同时创建该商品的全部初始 SKU。
+
+        使用规范：
+        1. `name`、`image_url` 为必填字段，且不能为空字符串。
+        2. `status` 缺省时默认为 `draft`；允许值为 `draft`、`pending`、`published`、`rejected`、`taken_down`。
+        3. 当 `core_attributes` 为空数组或缺省时，商品被视为单品 SPU，此时 `skus` 必须且只能包含 1 个 SKU，且该 SKU 的 `attribute_values` 必须为 `{}`。
+        4. 当 `core_attributes` 非空时，`skus` 中每个 SKU 的 `attribute_values` 键集合必须与 `core_attributes` 完全一致，且每个属性值都不能为空。
+        5. `tags` 为可选字段：传 `null` 表示不处理标签，传数组则会自动创建不存在的标签并建立关联。
+        6. `price` 必须大于 0，`stock` 必须大于等于 0。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductSpuCreateRequest'
+            examples:
+              attributeProduct:
+                summary: 多规格商品
+                value:
+                  name: 幼猫三文鱼冻干粮
+                  description: 高蛋白配方，适合 2-12 月龄幼猫。
+                  image_url: https://cdn.example.com/products/spu-101.jpg
+                  status: draft
+                  core_attributes:
+                    - 规格
+                    - 口味
+                  tags:
+                    - 主粮
+                    - 幼猫
+                  skus:
+                    - attribute_values:
+                        规格: 1.5kg
+                        口味: 三文鱼
+                      status: available
+                      image_url: https://cdn.example.com/products/sku-9001.jpg
+                      price: 79.90
+                      stock: 48
+                    - attribute_values:
+                        规格: 3kg
+                        口味: 三文鱼
+                      status: available
+                      image_url: https://cdn.example.com/products/sku-9002.jpg
+                      price: 139.00
+                      stock: 20
+              singleProduct:
+                summary: 单品商品
+                value:
+                  name: 猫草咀嚼棒
+                  description: 单规格猫草零食。
+                  image_url: https://cdn.example.com/products/spu-103.jpg
+                  status: draft
+                  core_attributes: []
+                  tags:
+                    - 零食
+                  skus:
+                    - attribute_values: {}
+                      status: available
+                      image_url: https://cdn.example.com/products/sku-9100.jpg
+                      price: 19.90
+                      stock: 200
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultProductId'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      product_id: 101
+                    metadata: {}
+        '400':
+          description: 参数校验失败或商品业务规则校验失败
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      name: 商品名称不能为空
+                      imageUrl: 商品图片不能为空
+                    metadata: {}
+                businessValidation:
+                  value:
+                    code: 400
+                    message: SKU属性名与SPU核心属性不一致
+                    data:
+                      field: skus[0].attributeValues
+                      expected:
+                        - 规格
+                        - 口味
+                      actual:
+                        - 规格
+                      errorType: PRODUCT_CREATE_INVALID
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+    put:
+      tags:
+        - Merchant Products
+      summary: 更新商品 SPU
+      operationId: updateMerchantProduct
+      description: |
+        更新商品 SPU 的基础信息，并按核心属性变更策略联动处理 SKU。
+
+        使用规范：
+        1. `id` 为必填字段，必须指向当前商户名下且处于激活状态的 SPU。
+        2. 请求体中的字段均为增量更新；未传字段保持原值不变。
+        3. 当 `core_attributes` 被修改且修改后为空数组时，商品将变为单品 SPU，`skus` 必须只提供 1 个 SKU，且其 `attribute_values` 必须为 `{}`。
+        4. 当 `core_attributes` 被修改且非空时，`skus` 中可混合“引用旧 SKU 模板的新建项”和“纯新建项”；无论哪种形式，最终 `attribute_values` 都必须与新的 `core_attributes` 完全一致。
+        5. 当 `core_attributes` 未修改时，若提交 `skus`，则每个 SKU 更新项都必须提供 `id`；系统会将旧 SKU 软删除并插入新 SKU 记录。
+        6. `tags` 传 `null` 表示不修改标签，传空数组表示清空所有标签，传非空数组表示同步到目标标签集合。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductSpuUpdateRequest'
+            examples:
+              updateBaseInfo:
+                summary: 更新基础信息与标签
+                value:
+                  id: 101
+                  name: 幼猫三文鱼冻干粮升级版
+                  description: 升级配方，添加益生菌。
+                  image_url: https://cdn.example.com/products/spu-101-new.jpg
+                  status: pending
+                  tags:
+                    - 主粮
+                    - 幼猫
+                    - 益生菌
+              changeCoreAttributes:
+                summary: 修改核心属性并重建 SKU
+                value:
+                  id: 101
+                  core_attributes:
+                    - 规格
+                    - 阶段
+                  skus:
+                    - price: 79.90
+                      stock: 30
+                      status: available
+                      attribute_values:
+                        规格: 1.5kg
+                        阶段: 幼猫
+                    - price: 139.00
+                      stock: 18
+                      status: available
+                      attribute_values:
+                        规格: 3kg
+                        阶段: 幼猫
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    metadata: {}
+        '400':
+          description: 参数校验失败或更新规则校验失败
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      id: 商品SPU ID不能为空
+                    metadata: {}
+                businessValidation:
+                  value:
+                    code: 400
+                    message: CA未改变时，SKU更新必须提供id
+                    data:
+                      field: skus[0].id
+                      errorType: PRODUCT_UPDATE_INVALID
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '404':
+          description: 商品不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                productNotFound:
+                  value:
+                    code: 404
+                    message: 商品不存在或无权限访问
+                    data:
+                      productId: 101
+                      merchantId: 2001
+                      errorType: PRODUCT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+    delete:
+      tags:
+        - Merchant Products
+      summary: 批量删除商品 SPU
+      operationId: deleteMerchantProducts
+      description: |
+        批量软删除商品 SPU，并联动软删除该 SPU 下的所有激活 SKU。
+
+        使用规范：
+        1. 请求体必须是非空 ID 数组，数组项不能为 `null`。
+        2. 仅允许删除当前商户自己的商品；任一 SPU 不存在或归属不正确时，整个请求失败。
+        3. 删除为软删除，会将 SPU 与其关联 SKU 的 `is_active` 置为 `0`，而不是物理删除。
+        4. 推荐按业务分批删除，避免在同一请求中提交过大的 ID 列表。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LongIdListRequest'
+            examples:
+              default:
+                value:
+                  - 101
+                  - 102
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    metadata: {}
+        '400':
+          description: 参数校验失败或请求体不合法
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      spuIds: must not be null
+                    metadata: {}
+                businessValidation:
+                  value:
+                    code: 400
+                    message: SPU ID列表不能为空
+                    data:
+                      field: spuIds
+                      errorType: PRODUCT_UPDATE_INVALID
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '404':
+          description: 商品不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                productNotFound:
+                  value:
+                    code: 404
+                    message: 商品不存在或无权限访问
+                    data:
+                      productId: 101
+                      merchantId: 2001
+                      errorType: PRODUCT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /merchant/products/sku:
+    post:
+      tags:
+        - Merchant Products
+      summary: 批量创建 SKU
+      operationId: createMerchantProductSkus
+      description: |
+        为已存在的 SPU 批量新增 SKU。
+
+        使用规范：
+        1. 请求体必须为非空数组，且每个元素都必须提供合法的 `spu_id`。
+        2. 若目标 SPU 为单品商品，则新增 SKU 的 `attribute_values` 必须为 `{}`；当前实现不允许再次为单品 SPU 重复创建空属性 SKU。
+        3. 若目标 SPU 为属性商品，则新增 SKU 的 `attribute_values` 键集合必须与目标 SPU 的 `core_attributes` 完全一致。
+        4. `price` 必须大于 0，`stock` 必须大于等于 0；`status` 缺省时默认为 `available`。
+        5. 同一请求可以作用于多个 SPU，但所有 SPU 都必须归属于当前商户。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/ProductSkuCreateRequest'
+            examples:
+              default:
+                value:
+                  - spu_id: 101
+                    attribute_values:
+                      规格: 5kg
+                      口味: 三文鱼
+                    status: available
+                    image_url: https://cdn.example.com/products/sku-9003.jpg
+                    price: 199.00
+                    stock: 12
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    metadata: {}
+        '400':
+          description: 参数校验失败或创建规则校验失败
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      createDTOList[0].price: 商品价格必须大于0
+                    metadata: {}
+                businessValidation:
+                  value:
+                    code: 400
+                    message: 目标SPU包含核心属性，SKU必须提供attributeValues
+                    data:
+                      field: skus[0].attributeValues
+                      spuId: 101
+                      errorType: PRODUCT_CREATE_INVALID
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '404':
+          description: 目标 SPU 不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                productNotFound:
+                  value:
+                    code: 404
+                    message: 商品不存在或无权限访问
+                    data:
+                      productId: 101
+                      merchantId: 2001
+                      errorType: PRODUCT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+    put:
+      tags:
+        - Merchant Products
+      summary: 批量更新 SKU
+      operationId: updateMerchantProductSkus
+      description: |
+        批量更新 SKU。当前实现采用“旧记录软删除 + 新记录插入”的方式保留变更轨迹。
+
+        使用规范：
+        1. 请求体必须为非空数组，且每个元素都必须提供 `id`。
+        2. SKU 必须归属于当前商户的商品；若校验归属失败，将返回 404。
+        3. 对属性商品而言，若提交 `attribute_values`，其键集合必须与所属 SPU 的 `core_attributes` 完全一致。
+        4. 对单品商品而言，`attribute_values` 只能为 `{}`。
+        5. 单个更新项未传的字段沿用旧 SKU 原值，已传字段覆盖旧值。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/ProductSkuUpdateRequest'
+            examples:
+              default:
+                value:
+                  - id: 9001
+                    price: 82.90
+                    stock: 36
+                    status: available
+                    attribute_values:
+                      规格: 1.5kg
+                      口味: 三文鱼
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    metadata: {}
+        '400':
+          description: 参数校验失败或更新规则校验失败
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      updateDTOList[0].id: 商品SKU ID不能为空
+                    metadata: {}
+                businessValidation:
+                  value:
+                    code: 400
+                    message: SKU属性名与SPU核心属性不一致
+                    data:
+                      field: skus[0].attributeValues
+                      expected:
+                        - 规格
+                        - 口味
+                      actual:
+                        - 规格
+                      errorType: PRODUCT_UPDATE_INVALID
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '404':
+          description: 目标商品不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                productNotFound:
+                  value:
+                    code: 404
+                    message: 商品不存在或无权限访问
+                    data:
+                      productId: 101
+                      merchantId: 2001
+                      errorType: PRODUCT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+    delete:
+      tags:
+        - Merchant Products
+      summary: 批量删除 SKU
+      operationId: deleteMerchantProductSkus
+      description: |
+        批量软删除 SKU，并重算受影响 SPU 的最低价格。
+
+        使用规范：
+        1. 请求体必须是非空 SKU ID 数组，且数组项不能为 `null`。
+        2. 所有 SKU 必须处于激活状态；若某个 SKU 不存在或已删除，请求会以 400 失败。
+        3. 所有关联 SPU 都必须归属于当前商户，否则返回 404。
+        4. 删除为软删除操作；删除后系统会自动重算对应 SPU 的 `min_price`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LongIdListRequest'
+            examples:
+              default:
+                value:
+                  - 9001
+                  - 9002
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    metadata: {}
+        '400':
+          description: 参数校验失败或删除规则校验失败
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                beanValidation:
+                  value:
+                    code: 400
+                    message: 参数校验失败
+                    data:
+                      skuIds: must not be null
+                    metadata: {}
+                businessValidation:
+                  value:
+                    code: 400
+                    message: SKU不存在或已被删除
+                    data:
+                      field: skuIds[0]
+                      skuId: 9001
+                      errorType: PRODUCT_UPDATE_INVALID
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '404':
+          description: 关联商品不存在或无权访问
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                productNotFound:
+                  value:
+                    code: 404
+                    message: 商品不存在或无权限访问
+                    data:
+                      productId: 101
+                      merchantId: 2001
+                      errorType: PRODUCT_NOT_FOUND
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /merchant/products/tags:
+    get:
+      tags:
+        - Merchant Products
+      summary: 查询商户正在使用的标签
+      operationId: listMerchantUsingTags
+      description: |
+        返回当前商户所有激活商品上已使用过的标签名称列表。
+
+        使用规范：
+        1. 仅统计当前商户 `is_active=1` 的 SPU 所关联的标签。
+        2. 返回结果已去重，但不保证稳定排序；调用方如需特定顺序，应自行排序。
+        3. 该接口用于前端创建和编辑商品时的标签候选数据回填，不保证返回系统全部标签。
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultTagList'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      - 主粮
+                      - 幼猫
+                      - 益生菌
+                    metadata: {}
+        '401':
+          $ref: '#/components/responses/LoginInvalidResponse'
+        '403':
+          $ref: '#/components/responses/MerchantNotFoundResponse'
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+components:
+  responses:
+    LoginInvalidResponse:
+      description: 登录信息缺失或已失效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppErrorResult'
+          examples:
+            loginInvalid:
+              value:
+                code: 401
+                message: 登录信息已失效，请重新登录
+                data:
+                  userId: null
+                  cause: JWT_USER_CONTEXT_MISSING
+                  errorType: LOGIN_INVALID
+                metadata: {}
+    MerchantNotFoundResponse:
+      description: 当前用户未完成商家认证或不存在商户信息
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AppErrorResult'
+          examples:
+            merchantNotFound:
+              value:
+                code: 403
+                message: 当前用户尚未完成商家认证或商家信息不存在
+                data:
+                  userId: 1
+                  errorType: MERCHANT_NOT_FOUND
+                metadata: {}
+    SystemErrorResponse:
+      description: 系统异常
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SystemErrorResult'
+          examples:
+            systemError:
+              value:
+                code: 500
+                message: 系统异常：Unexpected server error
+                metadata: {}
+
+  schemas:
+    ResultMetadata:
+      type: object
+      description: 扩展元数据，当前接口统一返回空对象。
+      additionalProperties: true
+      example: {}
+
+    ProductListStatus:
+      type: string
+      description: 商品列表查询状态过滤条件
+      enum:
+        - all
+        - draft
+        - pending
+        - published
+        - rejected
+        - taken_down
+
+    ProductSpuStatus:
+      type: string
+      description: 商品 SPU 状态
+      enum:
+        - draft
+        - pending
+        - published
+        - rejected
+        - taken_down
+
+    ProductSkuStatus:
+      type: string
+      description: 商品 SKU 状态
+      enum:
+        - available
+        - unavailable
+
+    ProductListRequest:
+      type: object
+      properties:
+        page:
+          type: integer
+          default: 1
+          description: 页码；小于等于 0 时服务端将回退为 1
+        size:
+          type: integer
+          default: 10
+          description: 每页数量；小于等于 0 时服务端将回退为 10
+        status:
+          $ref: '#/components/schemas/ProductListStatus'
+        tags:
+          type: array
+          description: 标签名称列表，当前实现按任一标签命中返回结果
+          items:
+            type: string
+          default: []
+        keyword:
+          type: string
+          description: 商品名称与标签名称的模糊搜索关键字
+          default: ''
+      additionalProperties: false
+
+    ProductSkuCreateRequest:
+      type: object
+      properties:
+        spu_id:
+          type: integer
+          format: int64
+          description: 独立创建 SKU 时必填；随 SPU 一起创建时忽略该字段
+        attribute_values:
+          type: object
+          description: SKU 属性键值对；单品商品必须为 `{}`，属性商品必须与 `core_attributes` 完全一致
+          additionalProperties: true
+        status:
+          $ref: '#/components/schemas/ProductSkuStatus'
+        image_url:
+          type: string
+          description: SKU 图片 URL
+        price:
+          type: number
+          format: double
+          description: SKU 价格，必须大于 0
+        stock:
+          type: integer
+          description: SKU 库存，必须大于等于 0
+      required:
+        - attribute_values
+        - price
+        - stock
+      additionalProperties: false
+
+    ProductSpuCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: 商品名称
+        description:
+          type: string
+          description: 商品描述
+        image_url:
+          type: string
+          minLength: 1
+          description: 商品主图 URL
+        status:
+          $ref: '#/components/schemas/ProductSpuStatus'
+        core_attributes:
+          type: array
+          description: 核心属性名称列表；空数组表示单品商品
+          items:
+            type: string
+        tags:
+          type: array
+          nullable: true
+          description: 标签名称列表；`null` 表示不处理标签
+          items:
+            type: string
+        skus:
+          type: array
+          description: 初始 SKU 列表
+          items:
+            $ref: '#/components/schemas/ProductSkuCreateRequest'
+      required:
+        - name
+        - image_url
+      additionalProperties: false
+
+    ProductSkuUpdateRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 需要更新的 SKU ID
+        attribute_values:
+          type: object
+          description: 更新后的 SKU 属性键值对
+          additionalProperties: true
+        status:
+          $ref: '#/components/schemas/ProductSkuStatus'
+        image_url:
+          type: string
+          nullable: true
+          description: SKU 图片 URL；传空字符串时服务端会清空图片
+        price:
+          type: number
+          format: double
+          description: SKU 价格；更新已有 SKU 时可选，创建新 SKU 时必填且需大于 0
+        stock:
+          type: integer
+          description: SKU 库存；更新已有 SKU 时可选，创建新 SKU 时必填
+      required:
+        - id
+      additionalProperties: false
+
+    ProductSpuUpdateRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 商品 SPU ID
+        name:
+          type: string
+          description: 商品名称
+        description:
+          type: string
+          nullable: true
+          description: 商品描述
+        image_url:
+          type: string
+          description: 商品主图 URL
+        status:
+          $ref: '#/components/schemas/ProductSpuStatus'
+        core_attributes:
+          type: array
+          nullable: true
+          description: 新的核心属性列表；`null` 表示不修改该字段
+          items:
+            type: string
+        tags:
+          type: array
+          nullable: true
+          description: 标签名称列表；`null` 表示不修改，空数组表示清空
+          items:
+            type: string
+        skus:
+          type: array
+          nullable: true
+          description: SKU 更新列表
+          items:
+            $ref: '#/components/schemas/ProductSkuUpdateRequest'
+      required:
+        - id
+      additionalProperties: false
+
+    LongIdListRequest:
+      type: array
+      minItems: 1
+      items:
+        type: integer
+        format: int64
+
+    BaseProductSpu:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        image_url:
+          type: string
+        min_price:
+          type: number
+          format: double
+        sales:
+          type: integer
+      required:
+        - id
+        - name
+        - image_url
+        - min_price
+        - sales
+      additionalProperties: false
+
+    ProductSku:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        attribute_values:
+          type: object
+          additionalProperties: true
+        status:
+          $ref: '#/components/schemas/ProductSkuStatus'
+        image_url:
+          type: string
+          nullable: true
+        price:
+          type: number
+          format: double
+        stock:
+          type: integer
+        create_time:
+          type: string
+          description: 时间字符串，示例格式为 `yyyy-MM-dd HH:mm:ss`
+        update_time:
+          type: string
+          description: 时间字符串，示例格式为 `yyyy-MM-dd HH:mm:ss`
+      required:
+        - id
+        - attribute_values
+        - status
+        - price
+        - stock
+        - create_time
+        - update_time
+      additionalProperties: false
+
+    ProductListData:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: '#/components/schemas/BaseProductSpu'
+        page_total:
+          type: integer
+          description: 总页数
+      required:
+        - products
+        - page_total
+      additionalProperties: false
+
+    ProductDetailData:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProductSpuStatus'
+        audit_reason:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        min_price:
+          type: number
+          format: double
+        sales:
+          type: integer
+        core_attributes:
+          type: array
+          items:
+            type: string
+        skus:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSku'
+        create_time:
+          type: string
+          description: 时间字符串，示例格式为 `yyyy-MM-dd HH:mm:ss`
+        update_time:
+          type: string
+          description: 时间字符串，示例格式为 `yyyy-MM-dd HH:mm:ss`
+      required:
+        - id
+        - name
+        - image_url
+        - status
+        - tags
+        - min_price
+        - sales
+        - core_attributes
+        - skus
+        - create_time
+        - update_time
+      additionalProperties: false
+
+    ProductIdData:
+      type: object
+      properties:
+        product_id:
+          type: integer
+          format: int64
+      required:
+        - product_id
+      additionalProperties: false
+
+    ResultProductList:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Success
+        data:
+          $ref: '#/components/schemas/ProductListData'
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      additionalProperties: false
+
+    ResultProductDetail:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ProductDetailData'
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      additionalProperties: false
+
+    ResultProductId:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ProductIdData'
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      additionalProperties: false
+
+    ResultTagList:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            type: string
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      additionalProperties: false
+
+    ResultVoid:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - metadata
+      additionalProperties: false
+
+    ValidationErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: 参数校验失败
+        data:
+          type: object
+          description: 字段错误映射，键名为字段路径，键值为错误信息
+          additionalProperties:
+            type: string
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      additionalProperties: false
+
+    AppErrorData:
+      type: object
+      description: 业务异常扩展数据，至少包含 `errorType` 字段，其余键由具体异常决定。
+      properties:
+        errorType:
+          type: string
+      additionalProperties: true
+
+    AppErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/AppErrorData'
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      additionalProperties: false
+
+    SystemErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 500
+        message:
+          type: string
+          example: 系统异常：Unexpected server error
+        metadata:
+          $ref: '#/components/schemas/ResultMetadata'
+      required:
+        - code
+        - message
+        - metadata
+      additionalProperties: false

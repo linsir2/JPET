@@ -1,0 +1,1 @@
+function e(){return typeof window<`u`&&window.__CONTEXT_PATH__!=null?window.__CONTEXT_PATH__:``}function t(e){let t=e??``;typeof window<`u`&&(window.__CONTEXT_PATH__=t,window.contextPath=t)}export{t as n,e as t};

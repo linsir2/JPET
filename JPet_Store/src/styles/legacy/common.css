@@ -1,0 +1,1327 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.App {
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* 背景图片层 - 无模糊效果 */
+.App::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/images/背景3.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  opacity: 0.35;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 添加一个半透明遮罩层，让内容更清晰 */
+.App::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(245, 247, 250, 0.2) 0%, rgba(195, 207, 226, 0.2) 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 商店Logo和名称区域 - 流光效果 */
+.shop-header {
+  background: linear-gradient(90deg,
+    #f2deb7 0%,
+    #b7d8c8 52%,
+    #9fd8ea 100%
+  );
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  box-shadow: 0 8px 24px rgba(69, 82, 96, 0.14);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加装饰性背景图案 - 左上角大爪子 */
+.shop-header::before {
+  content: '🐾';
+  position: absolute;
+  font-size: 150px;
+  opacity: 0.1;
+  left: -30px;
+  top: -30px;
+  transform: rotate(-15deg);
+  animation: pawFloat1 4s ease-in-out infinite;
+  z-index: 0;
+}
+
+@keyframes pawFloat1 {
+  0%, 100% {
+    transform: rotate(-15deg) translateY(0px);
+  }
+  50% {
+    transform: rotate(-15deg) translateY(-10px);
+  }
+}
+
+/* 右下角大爪子 */
+.shop-header::after {
+  content: '🐾';
+  position: absolute;
+  font-size: 150px;
+  opacity: 0.1;
+  right: -30px;
+  bottom: -30px;
+  transform: rotate(15deg);
+  animation: pawFloat2 4s ease-in-out infinite 0.5s;
+  z-index: 0;
+}
+
+@keyframes pawFloat2 {
+  0%, 100% {
+    transform: rotate(15deg) translateY(0px);
+  }
+  50% {
+    transform: rotate(15deg) translateY(-10px);
+  }
+}
+
+/* 添加更多装饰爪子 */
+.shop-header .paw-decoration {
+  position: absolute;
+  font-size: 60px;
+  opacity: 0.1;
+  pointer-events: none;
+  animation: pawPulse 3s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes pawPulse {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    opacity: 0.22;
+    transform: scale(1.15) rotate(10deg);
+  }
+}
+
+.shop-header .paw-1 { top: 10%; left: 15%; animation-delay: 0s; }
+.shop-header .paw-2 { top: 20%; right: 12%; animation-delay: 0.5s; }
+.shop-header .paw-3 { bottom: 15%; left: 20%; animation-delay: 1s; }
+.shop-header .paw-4 { bottom: 20%; right: 18%; animation-delay: 1.5s; }
+.shop-header .paw-5 { top: 50%; left: 8%; animation-delay: 2s; }
+.shop-header .paw-6 { top: 50%; right: 8%; animation-delay: 2.5s; }
+
+/* Logo区域 */
+.shop-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  animation: logoFloat 3s ease-in-out infinite;
+  margin-right: 30px;
+  z-index: 100;
+}
+
+@keyframes logoFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.logo-icon {
+  font-size: 48px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+  z-index: 2;
+}
+
+.logo-pet-left {
+  font-size: 32px;
+  position: absolute;
+  left: -35px;
+  top: 5px;
+  animation: petBounceLeft 2s ease-in-out infinite;
+}
+
+.logo-pet-right {
+  font-size: 32px;
+  position: absolute;
+  right: -35px;
+  top: 5px;
+  animation: petBounceRight 2s ease-in-out infinite;
+}
+
+@keyframes petBounceLeft {
+  0%, 100% {
+    transform: translateX(0) rotate(-10deg);
+  }
+  50% {
+    transform: translateX(-5px) rotate(-15deg);
+  }
+}
+
+@keyframes petBounceRight {
+  0%, 100% {
+    transform: translateX(0) rotate(10deg);
+  }
+  50% {
+    transform: translateX(5px) rotate(15deg);
+  }
+}
+
+/* 商店信息区域 */
+.shop-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  z-index: 100;
+}
+
+.shop-name {
+  font-size: 32px;
+  font-weight: bold;
+  color: white;
+  margin: 0;
+  text-shadow: 0 2px 10px rgba(66, 54, 40, 0.18);
+  letter-spacing: 2px;
+}
+
+.shop-slogan {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  text-align: center;
+  font-weight: 300;
+  letter-spacing: 1px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .shop-header {
+    padding: 15px;
+    gap: 15px;
+  }
+
+  .shop-logo {
+    transform: scale(0.8);
+  }
+
+  .logo-icon {
+    font-size: 40px;
+  }
+
+  .logo-pet-left,
+  .logo-pet-right {
+    font-size: 28px;
+  }
+
+  .shop-name {
+    font-size: 24px;
+    letter-spacing: 1px;
+  }
+
+  .shop-slogan {
+    font-size: 12px;
+  }
+}
+
+/* 顶部导航栏 */
+.tab-btn-box {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: rgba(255, 252, 247, 0.96);
+  box-shadow: 0 6px 20px rgba(54, 63, 74, 0.08);
+  padding: 10px 8px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  backdrop-filter: blur(12px);
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  border-radius: 14px;
+}
+
+.tab-btn:hover {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.tab-btn.active {
+  color: #d97706;
+  font-weight: 600;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 3px;
+  background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+  border-radius: 3px 3px 0 0;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.22);
+}
+
+.cart-badge {
+  position: absolute;
+  top: 5px;
+  right: 20%;
+  background: #ff4d4f;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 12px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* 轮播图区域 */
+.shop-head-box {
+  position: relative;
+  margin: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  height: 400px;
+}
+
+.banner-title {
+  position: absolute;
+  bottom: 70px;
+  left: 40px;
+  z-index: 10;
+  text-align: left;
+  color: white;
+  padding: 15px 30px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 8px;
+  backdrop-filter: blur(5px);
+}
+
+.banner-title h2 {
+  margin: 0;
+  font-size: 48px;
+  font-weight: 700;
+  text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
+  line-height: 1.2;
+}
+
+.banner-subtitle {
+  margin: 8px 0 0 0;
+  font-size: 20px;
+  font-weight: 400;
+  text-shadow: 1px 1px 4px rgba(0, 0, 0, 0.5);
+  opacity: 0.95;
+}
+
+.banner-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 0.5s ease;
+}
+
+.banner-btn-left,
+.banner-btn-right {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  font-size: 24px;
+  color: #ff6b9d;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 按钮流光效果 */
+.banner-btn-left::before,
+.banner-btn-right::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 107, 157, 0.3),
+    transparent
+  );
+  transform: skewX(-25deg);
+  animation: bannerBtnShine 3s infinite;
+}
+
+@keyframes bannerBtnShine {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 200%;
+  }
+}
+
+.banner-btn-left {
+  left: 20px;
+}
+
+.banner-btn-right {
+  right: 20px;
+}
+
+.banner-btn-left:hover,
+.banner-btn-right:hover {
+  background: linear-gradient(135deg, #ff6b9d 0%, #ffa07a 100%);
+  color: white;
+  transform: translateY(-50%) scale(1.15);
+  box-shadow: 0 6px 25px rgba(255, 107, 157, 0.5);
+}
+
+.banner-indicators {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+}
+
+.indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.indicator:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: scale(1.3);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.8);
+}
+
+.indicator.active {
+  background: linear-gradient(90deg, 
+    #ff6b9d 0%, 
+    #ffa07a 50%, 
+    #ff6b9d 100%
+  );
+  background-size: 200% 100%;
+  animation: indicatorShine 2s linear infinite;
+  width: 35px;
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 15px rgba(255, 107, 157, 0.6);
+}
+
+@keyframes indicatorShine {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* 主内容区域 */
+.shop-main-ui {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* 左侧朋友圈 */
+.left-pyq-box {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  height: fit-content;
+}
+
+.left-pyq-box h3 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 20px;
+  border-bottom: 2px solid #ff6b9d;
+  padding-bottom: 10px;
+}
+
+.friend-post {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.friend-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.friend-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.friend-name {
+  font-weight: 600;
+  color: #333;
+}
+
+.friend-message {
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.friend-product-image {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+/* 中间商品区域 */
+.center-goods-box {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.center-goods-box h3 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 24px;
+  border-bottom: 2px solid #43e97b;
+  padding-bottom: 10px;
+}
+
+.goods-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.goods-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.goods-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.goods-item img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.goods-item h4 {
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.goods-description {
+  color: #888;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.goods-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.goods-price {
+  color: #ff4d4f;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.goods-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(67, 233, 123, 0.3);
+}
+
+/* 商品按钮流光效果 */
+.goods-btn::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  transform: skewX(-25deg);
+  animation: goodsBtnShine 2.5s infinite;
+}
+
+@keyframes goodsBtnShine {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 200%;
+  }
+}
+
+.goods-btn:hover {
+  transform: scale(1.08) translateY(-2px);
+  box-shadow: 0 4px 15px rgba(67, 233, 123, 0.5);
+}
+
+/* 右侧客服消息 */
+.right-customer-service-message-box {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  height: fit-content;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-customer-service-message-box h3 {
+  color: #333;
+  margin-bottom: 20px;
+  font-size: 20px;
+  border-bottom: 2px solid #ffa07a;
+  padding-bottom: 10px;
+}
+
+.service-messages {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.service-message {
+  background: #f0f8ff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.service-time {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.service-content {
+  color: #333;
+  line-height: 1.5;
+}
+
+.service-input-box {
+  display: flex;
+  gap: 10px;
+}
+
+.service-input-box input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.service-input-box button {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #ffa07a 0%, #ff6b9d 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(255, 160, 122, 0.3);
+}
+
+/* 服务按钮流光效果 */
+.service-input-box button::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  transform: skewX(-25deg);
+  animation: serviceBtnShine 2.8s infinite;
+}
+
+@keyframes serviceBtnShine {
+  0% {
+    left: -100%;
+  }
+  50%, 100% {
+    left: 200%;
+  }
+}
+
+.service-input-box button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(255, 160, 122, 0.5);
+}
+
+.service-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.service-item:hover {
+  background: linear-gradient(135deg, #ffe5ec 0%, #fff0f3 100%);
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(255, 107, 157, 0.2);
+}
+
+.service-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.avatar-icon {
+  font-size: 24px;
+}
+
+.service-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.service-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 5px;
+  font-size: 16px;
+}
+
+.service-last-message {
+  color: #999;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.service-badge {
+  flex-shrink: 0;
+}
+
+.unread-count {
+  background: #ff4d4f;
+  color: white;
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 20px;
+  display: inline-block;
+  text-align: center;
+}
+
+.no-service-tip {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.no-service-tip p {
+  margin: 5px 0;
+}
+
+.tip-desc {
+  font-size: 12px;
+  color: #bbb;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .shop-main-ui {
+    grid-template-columns: 1fr;
+  }
+  
+  .goods-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .goods-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .shop-head-box {
+    height: 300px;
+  }
+  
+  .banner-title {
+    padding: 12px 25px;
+    bottom: 60px;
+    left: 20px;
+  }
+  
+  .banner-title h2 {
+    font-size: 32px;
+  }
+  
+  .banner-subtitle {
+    font-size: 16px;
+  }
+  
+  .banner-btn-left,
+  .banner-btn-right {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+  
+  .banner-btn-left {
+    left: 10px;
+  }
+  
+  .banner-btn-right {
+    right: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .shop-head-box {
+    height: 250px;
+  }
+  
+  .banner-title {
+    padding: 10px 20px;
+    bottom: 50px;
+    left: 15px;
+  }
+  
+  .banner-title h2 {
+    font-size: 20px;
+  }
+  
+  .banner-subtitle {
+    font-size: 13px;
+    margin-top: 5px;
+  }
+}
+
+/* 商品详情弹窗样式 */
+.product-detail-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.product-detail-container {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.detail-close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-close-btn:hover {
+  background: rgba(0, 0, 0, 0.2);
+  color: #333;
+  transform: rotate(90deg);
+}
+
+.detail-content {
+  display: flex;
+  padding: 30px;
+  gap: 40px;
+}
+
+.detail-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-image-box {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f8f8f8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-image-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.detail-image-box:hover img {
+  transform: scale(1.05);
+}
+
+.detail-sales-info {
+  display: flex;
+  justify-content: space-around;
+  padding: 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  color: white;
+  font-size: 14px;
+}
+
+.sales-count, .stock-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+}
+
+.detail-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-product-name {
+  font-size: 28px;
+  font-weight: bold;
+  color: #333;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.detail-product-category {
+  display: inline-block;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  width: fit-content;
+}
+
+.detail-price-box {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.detail-price {
+  font-size: 36px;
+  font-weight: bold;
+  color: #ff4757;
+}
+
+.detail-original-price {
+  font-size: 18px;
+  color: #999;
+  text-decoration: line-through;
+}
+
+.detail-description {
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+}
+
+.detail-description h3 {
+  font-size: 18px;
+  color: #333;
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+.detail-description p {
+  font-size: 15px;
+  color: #666;
+  line-height: 1.8;
+  margin: 0;
+}
+
+.detail-option-box {
+  padding: 15px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-option-box h4 {
+  font-size: 16px;
+  color: #333;
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+.option-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.option-btn {
+  padding: 10px 20px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.option-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+  transform: translateY(-2px);
+}
+
+.option-btn.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: fit-content;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.quantity-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  font-size: 20px;
+  color: #667eea;
+  transition: all 0.3s ease;
+  font-weight: bold;
+}
+
+.quantity-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.quantity-btn:disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+.quantity-input {
+  width: 60px;
+  height: 40px;
+  border: none;
+  border-left: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.quantity-input:focus {
+  outline: none;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 10px;
+  padding-top: 20px;
+}
+
+.detail-add-cart-btn,
+.detail-buy-now-btn {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.detail-add-cart-btn {
+  background: white;
+  border: 2px solid #667eea;
+  color: #667eea;
+}
+
+.detail-add-cart-btn:hover {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3);
+}
+
+.detail-buy-now-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.detail-buy-now-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+}
+
+.product-detail-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.product-detail-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.product-detail-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+}
+
+.product-detail-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+@media (max-width: 768px) {
+  .detail-content {
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .detail-product-name {
+    font-size: 22px;
+  }
+
+  .detail-price {
+    font-size: 28px;
+  }
+
+  .detail-actions {
+    flex-direction: column;
+  }
+
+  .product-detail-container {
+    width: 95%;
+    max-height: 95vh;
+  }
+}
+
+.user-info-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+  max-width: 1240px;
+  margin: 10px auto 0;
+  padding: 0 20px;
+  background: transparent;
+    gap: 15px;
+}
+
+.welcome-text {
+  color: #5b6470;
+    font-size: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(203, 213, 225, 0.8);
+}
+
+.logout-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #fb923c, #14b8a6);
+    color: white;
+    border: none;
+  border-radius: 999px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}

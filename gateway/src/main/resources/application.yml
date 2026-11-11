@@ -1,0 +1,66 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+    gateway:
+      server:
+        webflux:
+          routes:
+            # user-service
+            - id: user-auth
+              uri: lb://user-service
+              predicates:
+                - Path=/api/auth/**
+            - id: user-profile
+              uri: lb://user-service
+              predicates:
+                - Path=/api/user/**
+            - id: admin-users
+              uri: lb://user-service
+              predicates:
+                - Path=/api/admin/users/**
+
+            # order-service (specific merchant orders must be before /api/merchant/**)
+            - id: merchant-orders
+              uri: lb://order-service
+              predicates:
+                - Path=/api/merchant/orders/**
+            - id: orders
+              uri: lb://order-service
+              predicates:
+                - Path=/api/orders/**
+
+            # product-service
+            - id: products
+              uri: lb://product-service
+              predicates:
+                - Path=/api/products/**
+            - id: merchant
+              uri: lb://product-service
+              predicates:
+                - Path=/api/merchant/**
+            - id: admin-merchants
+              uri: lb://product-service
+              predicates:
+                - Path=/api/admin/merchants/**
+            - id: admin-products
+              uri: lb://product-service
+              predicates:
+                - Path=/api/admin/products/**
+            # legacy frontend call: no backend controller, preserve 404 via service
+            - id: legacy-cart
+              uri: lb://product-service
+              predicates:
+                - Path=/api/cart/**
+
+            # SPA + uploads served by product-service (keeps vite build output unchanged)
+            - id: spa
+              uri: lb://product-service
+              predicates:
+                - Path=/spa/**,/spa,/uploads/**

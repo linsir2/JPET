@@ -1,0 +1,907 @@
+openapi: 3.0.3
+info:
+  title: Pet Shop Backend Admin API
+  version: 1.0.0
+  description: |
+    管理员认证与后台管理接口文档。
+
+    说明：
+    1. 管理员注册与登录接口返回 `common.utils.Result` 结构，包含 `metadata` 字段。
+    2. `/api/admin/**` 管理接口返回 `common.Constant.Result` 结构，`metadata` 可能为空或为 `null`。
+    3. 当前 JWT 鉴权要求 `/api/admin/**` 请求必须携带管理员 access token，角色仅允许 `main_admin` 或 `sub_admin`。
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+tags:
+  - name: Admin Auth
+    description: 管理员注册与登录接口
+  - name: Admin Users
+    description: 管理员用户管理接口
+  - name: Admin Merchants
+    description: 管理员商家审核与认证信息接口
+  - name: Admin Products
+    description: 管理员商品审核接口
+paths:
+  /api/auth/admin/register:
+    post:
+      tags:
+        - Admin Auth
+      summary: 管理员注册
+      operationId: registerAdmin
+      description: |
+        使用预配置的注册密钥注册管理员账号。
+
+        规则：
+        1. 请求体必须提供 `account`、`password`、`register_key`。
+        2. 若 `register_key` 命中主管理员密钥，则注册为 `main_admin`。
+        3. 若 `register_key` 命中子管理员密钥，则注册为 `sub_admin`。
+        4. 若密钥不匹配任意配置项，则返回 403。
+        5. 管理员账号必须唯一。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRegisterRequest'
+            examples:
+              mainAdmin:
+                summary: 注册主管理员
+                value:
+                  account: admin_root
+                  password: Admin_pass1
+                  register_key: replace-with-main-admin-register-key
+              subAdmin:
+                summary: 注册子管理员
+                value:
+                  account: admin_ops
+                  password: Admin_pass1
+                  register_key: replace-with-sub-admin-register-key
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilsResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: 管理员注册成功，请登录
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '403':
+          description: 管理员注册密钥错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilsAppErrorResult'
+              examples:
+                invalidRegisterKey:
+                  value:
+                    code: 403
+                    message: 管理员注册密钥错误
+                    data:
+                      account: admin_root
+                      errorType: ADMIN_REGISTER_KEY_INVALID
+                    metadata: {}
+        '409':
+          description: 管理员账号已存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilsAppErrorResult'
+              examples:
+                accountConflict:
+                  value:
+                    code: 409
+                    message: 管理员账户已存在
+                    data:
+                      account: admin_root
+                      errorType: ADMIN_REGISTER_CONFLICT
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/UtilsSystemErrorResponse'
+
+  /api/auth/admin/login:
+    post:
+      tags:
+        - Admin Auth
+      summary: 管理员登录
+      operationId: loginAdmin
+      description: 管理员登录后返回 access token、refresh token 和角色信息。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilsResultLoginVo'
+              examples:
+                mainAdmin:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      access_token: <ACCESS_TOKEN>
+                      refresh_token: <REFRESH_TOKEN>
+                      role: main_admin
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          description: 管理员账号或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UtilsAppErrorResult'
+              examples:
+                invalidCredentials:
+                  value:
+                    code: 401
+                    message: 管理员账号或密码错误
+                    data:
+                      loginType: admin_login
+                      principal: admin_root
+                      errorType: AUTH_CREDENTIALS_INVALID
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/UtilsSystemErrorResponse'
+
+  /api/admin/users:
+    get:
+      tags:
+        - Admin Users
+      summary: 分页查询用户
+      operationId: getUsers
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: username
+          in: query
+          schema:
+            type: string
+        - name: email
+          in: query
+          schema:
+            type: string
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum:
+              - normal_user
+              - merchant_user
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - normal
+              - banned
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultUserPage'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/users/{id}:
+    get:
+      tags:
+        - Admin Users
+      summary: 查询用户详情
+      operationId: getUserById
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultUserVo'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/users/{id}/status:
+    put:
+      tags:
+        - Admin Users
+      summary: 更新用户状态
+      operationId: updateUserStatus
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserStatusUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultVoid'
+        '400':
+          $ref: '#/components/responses/ConstantValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/merchants/audits:
+    get:
+      tags:
+        - Admin Merchants
+      summary: 分页查询待审核商家
+      operationId: getPendingMerchants
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultMerchantPage'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/merchants/{id}/audit:
+    put:
+      tags:
+        - Admin Merchants
+      summary: 审核商家入驻申请
+      operationId: auditMerchant
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantAuditRequest'
+      responses:
+        '200':
+          description: 审核成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultVoid'
+        '400':
+          $ref: '#/components/responses/ConstantValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/merchants/{merchantId}/authentications:
+    get:
+      tags:
+        - Admin Merchants
+      summary: 查询商家认证列表
+      operationId: getMerchantAuthentications
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: merchantId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultAuthenticationList'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/products/audits:
+    get:
+      tags:
+        - Admin Products
+      summary: 分页查询待审核商品
+      operationId: getPendingProducts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultProductPage'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+  /api/admin/products/{id}/audit:
+    put:
+      tags:
+        - Admin Products
+      summary: 审核商品
+      operationId: auditProduct
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductAuditRequest'
+      responses:
+        '200':
+          description: 审核成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConstantResultVoid'
+        '400':
+          $ref: '#/components/responses/ConstantValidationErrorResponse'
+        '401':
+          $ref: '#/components/responses/SecureUnauthorizedResponse'
+        '403':
+          $ref: '#/components/responses/SecureForbiddenResponse'
+        '500':
+          $ref: '#/components/responses/ConstantSystemErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ValidationErrorResponse:
+      description: 参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UtilsValidationErrorResult'
+    ConstantValidationErrorResponse:
+      description: 参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConstantValidationErrorResult'
+    UtilsSystemErrorResponse:
+      description: 系统异常
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UtilsSystemErrorResult'
+    ConstantSystemErrorResponse:
+      description: 系统异常
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConstantSystemErrorResult'
+    SecureUnauthorizedResponse:
+      description: 未登录、token 缺失或 token 无效
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SecureErrorResult'
+          examples:
+            unauthorized:
+              value:
+                code: 401
+                message: 未登录或登录已失效
+                metadata: {}
+    SecureForbiddenResponse:
+      description: 当前角色无权访问该资源
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SecureErrorResult'
+          examples:
+            forbidden:
+              value:
+                code: 403
+                message: 当前账号无权访问该资源
+                metadata: {}
+
+  schemas:
+    AdminRegisterRequest:
+      type: object
+      required:
+        - account
+        - password
+        - register_key
+      properties:
+        account:
+          type: string
+          example: admin_root
+        password:
+          type: string
+          pattern: ^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])[a-zA-Z0-9_]{8,}$
+          example: Admin_pass1
+        register_key:
+          type: string
+          example: replace-with-main-admin-register-key
+
+    AdminLoginRequest:
+      type: object
+      required:
+        - account
+        - password
+      properties:
+        account:
+          type: string
+          example: admin_root
+        password:
+          type: string
+          example: Admin_pass1
+
+    UserStatusUpdateRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - normal
+            - banned
+
+    MerchantAuditRequest:
+      type: object
+      required:
+        - audit_status
+      properties:
+        audit_status:
+          type: string
+          enum:
+            - active
+            - rejected
+        audit_reason:
+          type: string
+          nullable: true
+
+    ProductAuditRequest:
+      type: object
+      required:
+        - audit_status
+      properties:
+        audit_status:
+          type: string
+          description: 当前实现仍存在历史状态值约束，请与后端实际审核逻辑保持一致
+          example: 已拒绝
+        audit_reason:
+          type: string
+          nullable: true
+
+    LoginVo:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+        - role
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        role:
+          type: string
+          enum:
+            - main_admin
+            - sub_admin
+
+    UserVo:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        profile:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    MerchantVo:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        merchant_name:
+          type: string
+        image_url:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        status:
+          type: string
+        audit_reason:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ProductSpuVo:
+      type: object
+      properties:
+        id:
+          type: integer
+        merchant_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+        status:
+          type: string
+        audit_reason:
+          type: string
+          nullable: true
+        min_price:
+          type: number
+          format: double
+        core_attributes:
+          type: array
+          items:
+            type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    AuthenticationVo:
+      type: object
+      properties:
+        id:
+          type: integer
+        merchant_id:
+          type: integer
+        authentication_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ConstantPageUserVo:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserVo'
+
+    ConstantPageMerchantVo:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/MerchantVo'
+
+    ConstantPageProductSpuVo:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductSpuVo'
+
+    UtilsResultVoid:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UtilsResultLoginVo:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/LoginVo'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UtilsValidationErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UtilsAppErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UtilsSystemErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ConstantResultVoid:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantResultUserVo:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/UserVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantResultUserPage:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ConstantPageUserVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantResultMerchantPage:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ConstantPageMerchantVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantResultProductPage:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          $ref: '#/components/schemas/ConstantPageProductSpuVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantResultAuthenticationList:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthenticationVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantValidationErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    ConstantSystemErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    SecureErrorResult:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true

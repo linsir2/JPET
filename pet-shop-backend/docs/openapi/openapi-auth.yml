@@ -1,0 +1,835 @@
+openapi: 3.0.3
+info:
+  title: Pet Shop Backend Auth API
+  version: 1.0.0
+  description: |
+    认证与商家入驻相关接口文档。
+
+    统一响应约定：
+    1. 所有接口统一返回 `code`、`message`、`data`、`metadata` 四个字段。
+    2. 成功时默认 `code=200`，未显式自定义时 `message=Success`。
+    3. DTO/VO 经过 Jackson 的 `snake_case` 命名策略序列化，因此请求体与成功响应体中的对象字段使用下划线命名。
+    4. 校验错误和业务异常中的 `data` 来自后端 `Map<String, Object>`，其中字段名保持服务端原始 key，不额外转换为 `snake_case`。
+    5. `/api/merchant/apply` 需要携带商家侧 access token；当前安全配置允许 `normal_user` 与 `merchant_user` 两类角色访问该接口。
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+tags:
+  - name: Auth
+    description: 登录、注册与 token 刷新接口
+  - name: Merchant Onboarding
+    description: 登录后的商家入驻申请接口
+paths:
+  /api/auth/merchant/register:
+    post:
+      tags:
+        - Auth
+      summary: 用户注册
+      operationId: registerMerchantUser
+      description: |
+        注册一个普通用户账号，供后续商家登录入口与商家入驻流程使用。
+
+        使用规范：
+        1. 该接口不会直接创建商家记录，只会写入 `user_tb`。
+        2. 注册成功后用户初始角色固定为 `normal_user`，账号状态固定为 `normal`。
+        3. `username` 与 `email` 必须唯一；邮箱会在服务端转为小写后参与唯一性校验。
+        4. 密码必须满足正则：至少 8 位，且包含数字、大写字母、小写字母，只允许字母、数字和下划线。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+            examples:
+              default:
+                summary: 注册示例
+                value:
+                  username: alice_pet
+                  email: Alice@example.com
+                  password: Pass_word1
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultVoid'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: 注册成功，请登录后继续完成商家入驻申请
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '409':
+          description: 用户名或邮箱冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                usernameConflict:
+                  value:
+                    code: 409
+                    message: 用户名已存在
+                    data:
+                      field: username
+                      value: alice_pet
+                      errorType: USER_REGISTER_CONFLICT
+                    metadata: {}
+                emailConflict:
+                  value:
+                    code: 409
+                    message: 邮箱已存在
+                    data:
+                      field: email
+                      value: alice@example.com
+                      errorType: USER_REGISTER_CONFLICT
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /api/auth/merchant/login:
+    post:
+      tags:
+        - Auth
+      summary: 商家侧登录
+      operationId: loginMerchant
+      description: |
+        商家侧统一登录入口。
+
+        使用规范：
+        1. `identifier` 同时支持用户名或邮箱。
+        2. 当前实现允许 `normal_user` 和 `merchant_user` 都从该入口登录；普通用户登录后会进入商家界面，由前端继续引导其提交商家入驻申请。
+        3. 登录成功后返回 `access_token`、`refresh_token` 和当前角色值 `role`。
+        4. 若账号状态不是 `normal`，服务端会拒绝登录。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantLoginRequest'
+            examples:
+              usernameLogin:
+                summary: 使用用户名登录
+                value:
+                  identifier: alice_pet
+                  password: Pass_word1
+              emailLogin:
+                summary: 使用邮箱登录
+                value:
+                  identifier: alice@example.com
+                  password: Pass_word1
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultLoginVo'
+              examples:
+                normalUser:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      access_token: <ACCESS_TOKEN>
+                      refresh_token: <REFRESH_TOKEN>
+                      role: normal_user
+                    metadata: {}
+                merchantUser:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      access_token: <ACCESS_TOKEN>
+                      refresh_token: <REFRESH_TOKEN>
+                      role: merchant_user
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          description: 用户名/邮箱或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                invalidCredentials:
+                  value:
+                    code: 401
+                    message: 用户名/邮箱或密码错误
+                    data:
+                      loginType: merchant_login
+                      principal: alice_pet
+                      errorType: AUTH_CREDENTIALS_INVALID
+                    metadata: {}
+        '403':
+          description: 账号状态异常
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                banned:
+                  value:
+                    code: 403
+                    message: 当前账号已被拉黑，无法登录
+                    data:
+                      subjectType: user
+                      subjectId: 1001
+                      status: banned
+                      errorType: ACCOUNT_STATUS_INVALID
+                    metadata: {}
+                abnormal:
+                  value:
+                    code: 403
+                    message: 当前账号状态异常，无法登录
+                    data:
+                      subjectType: user
+                      subjectId: 1001
+                      status: frozen
+                      errorType: ACCOUNT_STATUS_INVALID
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /api/auth/admin/login:
+    post:
+      tags:
+        - Auth
+      summary: 管理员登录
+      operationId: loginAdmin
+      description: |
+        管理员登录接口。
+
+        使用规范：
+        1. `account` 为管理员账号，不支持邮箱替代。
+        2. 仅管理员表中的账号可以登录成功。
+        3. 登录成功后返回 `role=main_admin` 或 `role=sub_admin`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginRequest'
+            examples:
+              default:
+                summary: 管理员登录示例
+                value:
+                  account: admin_root
+                  password: Admin_pass1
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultLoginVo'
+              examples:
+                mainAdmin:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      access_token: <ACCESS_TOKEN>
+                      refresh_token: <REFRESH_TOKEN>
+                      role: main_admin
+                    metadata: {}
+                subAdmin:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      access_token: <ACCESS_TOKEN>
+                      refresh_token: <REFRESH_TOKEN>
+                      role: sub_admin
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          description: 管理员账号或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                invalidCredentials:
+                  value:
+                    code: 401
+                    message: 管理员账号或密码错误
+                    data:
+                      loginType: admin_login
+                      principal: admin_root
+                      errorType: AUTH_CREDENTIALS_INVALID
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /api/auth/token/refresh:
+    post:
+      tags:
+        - Auth
+      summary: 刷新 access token
+      operationId: refreshAccessToken
+      description: |
+        使用 `refresh_token` 换取新的 `access_token`。
+
+        使用规范：
+        1. 请求体必须传 `refresh_token`。
+        2. 当前实现只签发新的 `access_token`，不会轮换或返回新的 `refresh_token`。
+        3. 若传入的是 access token、格式非法、已过期或签名错误，统一返回 401。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+            examples:
+              default:
+                summary: 刷新 token 示例
+                value:
+                  refresh_token: <REFRESH_TOKEN>
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultTokenRefreshVo'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: Success
+                    data:
+                      access_token: <NEW_ACCESS_TOKEN>
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          description: refresh token 非法、过期或类型错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                expiredOrInvalid:
+                  value:
+                    code: 401
+                    message: refresh_token 无效或已过期
+                    data:
+                      loginType: refresh_token
+                      principal: null
+                      errorType: AUTH_CREDENTIALS_INVALID
+                    metadata: {}
+                wrongTokenType:
+                  value:
+                    code: 401
+                    message: 当前凭证不是 refresh_token
+                    data:
+                      loginType: refresh_token
+                      principal: null
+                      errorType: AUTH_CREDENTIALS_INVALID
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+  /api/merchant/apply:
+    post:
+      tags:
+        - Merchant Onboarding
+      summary: 提交商家入驻申请
+      operationId: applyMerchant
+      security:
+        - BearerAuth: []
+      description: |
+        登录后提交商家入驻申请。
+
+        使用规范：
+        1. 调用方必须携带商家侧 `access_token`，并通过 `Authorization: Bearer <token>` 传入。
+        2. 当前安全配置允许 `normal_user` 与 `merchant_user` 访问该接口，但 `merchant_user` 会在业务层被拒绝为重复申请。
+        3. 若当前用户没有商家记录，则新建 `merchant_tb(status=pending)`；若最近一条商家记录状态为 `rejected`，则复用该记录重新提交并重置为 `pending`。
+        4. 若最近一条商家记录状态为 `pending`、`active` 或 `banned`，接口会返回冲突或状态异常错误。
+        5. `tags` 中的空白项会被忽略；服务端会自动创建不存在的标签，并同步当前商家的标签关联关系。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantApplyRequest'
+            examples:
+              default:
+                summary: 商家入驻申请示例
+                value:
+                  merchant_name: 毛球宠物精选店
+                  image_url: https://cdn.example.com/merchant/logo-2001.png
+                  description: 主打猫粮、猫砂与猫咪保健用品。
+                  tags:
+                    - 主粮
+                    - 猫咪
+                    - 保健
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultMerchantApply'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: 商家入驻申请已提交
+                    data:
+                      merchant_id: 2001
+                      status: pending
+                    metadata: {}
+        '400':
+          $ref: '#/components/responses/ValidationErrorResponse'
+        '401':
+          description: 未登录、token 缺失、token 非法或 token 过期
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SecurityErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                missingToken:
+                  value:
+                    code: 401
+                    message: 未提供 access_token
+                    metadata: {}
+                invalidToken:
+                  value:
+                    code: 401
+                    message: 无效或已过期的登录凭证
+                    metadata: {}
+                contextMissing:
+                  value:
+                    code: 401
+                    message: 登录信息已失效，请重新登录
+                    data:
+                      userId: 1001
+                      cause: JWT_USER_CONTEXT_MISSING
+                      errorType: LOGIN_INVALID
+                    metadata: {}
+        '403':
+          description: 权限不足或账号状态异常
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SecurityErrorResult'
+                  - $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                forbiddenByRole:
+                  value:
+                    code: 403
+                    message: 当前账号无权访问该资源
+                    metadata: {}
+                abnormalUserStatus:
+                  value:
+                    code: 403
+                    message: 当前账号状态异常，无法提交商家申请
+                    data:
+                      subjectType: user
+                      subjectId: 1001
+                      status: banned
+                      errorType: ACCOUNT_STATUS_INVALID
+                    metadata: {}
+                bannedMerchant:
+                  value:
+                    code: 403
+                    message: 当前商家账号已被封禁，无法重新申请
+                    data:
+                      subjectType: merchant
+                      subjectId: 2001
+                      status: banned
+                      errorType: ACCOUNT_STATUS_INVALID
+                    metadata: {}
+        '409':
+          description: 当前状态不允许重复申请或申请信息冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppErrorResult'
+              examples:
+                alreadyPending:
+                  value:
+                    code: 409
+                    message: 当前账号已经提交过商家申请，请等待管理员审核
+                    data:
+                      userId: 1001
+                      merchantStatus: pending
+                      errorType: MERCHANT_APPLY_CONFLICT
+                    metadata: {}
+                alreadyMerchant:
+                  value:
+                    code: 409
+                    message: 当前账号已经是商家用户，无需重复申请
+                    data:
+                      userId: 1001
+                      merchantStatus: active
+                      errorType: MERCHANT_APPLY_CONFLICT
+                    metadata: {}
+                merchantNameExists:
+                  value:
+                    code: 409
+                    message: 商家名称已存在，请更换后重试
+                    data:
+                      userId: null
+                      merchantStatus: null
+                      errorType: MERCHANT_APPLY_CONFLICT
+                    metadata: {}
+        '500':
+          $ref: '#/components/responses/SystemErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    ValidationErrorResponse:
+      description: 参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResult'
+          examples:
+            registerValidation:
+              value:
+                code: 400
+                message: 参数校验失败
+                data:
+                  username: 用户名不能为空
+                  email: 邮箱格式错误
+                  password: 密码至少8位密码，只允许包含数字、大小写英文字母和下划线，且必须含有数字和大小写英文字母
+                metadata: {}
+            merchantApplyValidation:
+              value:
+                code: 400
+                message: 参数校验失败
+                data:
+                  merchantName: 商户名称不能为空
+                  imageUrl: 商家图片不能为空
+                metadata: {}
+
+    SystemErrorResponse:
+      description: 未捕获系统异常
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SecurityErrorResult'
+          examples:
+            systemError:
+              value:
+                code: 500
+                message: 系统异常：Unexpected error
+                metadata: {}
+
+  schemas:
+    UserRegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          description: 用户名
+          minLength: 1
+          example: alice_pet
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+          example: alice@example.com
+        password:
+          type: string
+          description: 至少 8 位，包含数字、大写字母、小写字母，只允许字母、数字和下划线
+          pattern: ^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])[a-zA-Z0-9_]{8,}$
+          example: Pass_word1
+
+    MerchantLoginRequest:
+      type: object
+      required:
+        - identifier
+        - password
+      properties:
+        identifier:
+          type: string
+          description: 用户名或邮箱
+          example: alice_pet
+        password:
+          type: string
+          description: 登录密码
+          example: Pass_word1
+
+    AdminLoginRequest:
+      type: object
+      required:
+        - account
+        - password
+      properties:
+        account:
+          type: string
+          description: 管理员账号
+          example: admin_root
+        password:
+          type: string
+          description: 管理员密码
+          example: Admin_pass1
+
+    TokenRefreshRequest:
+      type: object
+      required:
+        - refresh_token
+      properties:
+        refresh_token:
+          type: string
+          description: refresh token
+          example: eyJhbGciOiJIUzI1NiJ9.refresh.example
+
+    MerchantApplyRequest:
+      type: object
+      required:
+        - merchant_name
+        - image_url
+      properties:
+        merchant_name:
+          type: string
+          description: 商户名称
+          minLength: 1
+          example: 毛球宠物精选店
+        image_url:
+          type: string
+          description: 商家图片 URL
+          minLength: 1
+          example: https://cdn.example.com/merchant/logo-2001.png
+        description:
+          type: string
+          description: 商户简介，最长 500 字
+          maxLength: 500
+          example: 主打猫粮、猫砂与猫咪保健用品。
+        tags:
+          type: array
+          description: 商家标签列表，空白项会被忽略
+          items:
+            type: string
+          example:
+            - 主粮
+            - 猫咪
+            - 保健
+
+    LoginVo:
+      type: object
+      required:
+        - access_token
+        - refresh_token
+        - role
+      properties:
+        access_token:
+          type: string
+          description: 用于访问受保护接口的 JWT access token
+          example: <ACCESS_TOKEN>
+        refresh_token:
+          type: string
+          description: 用于刷新 access token 的 JWT refresh token
+          example: <REFRESH_TOKEN>
+        role:
+          type: string
+          description: 当前登录主体角色
+          enum:
+            - normal_user
+            - merchant_user
+            - main_admin
+            - sub_admin
+          example: normal_user
+
+    TokenRefreshVo:
+      type: object
+      required:
+        - access_token
+      properties:
+        access_token:
+          type: string
+          description: 新签发的 JWT access token
+          example: <NEW_ACCESS_TOKEN>
+
+    MerchantApplyResultData:
+      type: object
+      required:
+        - merchant_id
+        - status
+      properties:
+        merchant_id:
+          type: integer
+          format: int64
+          description: 商家记录 ID
+          example: 2001
+        status:
+          type: string
+          description: 提交后的商家状态
+          enum:
+            - pending
+          example: pending
+
+    ResultVoid:
+      type: object
+      required:
+        - code
+        - message
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Success
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
+
+    ResultLoginVo:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Success
+        data:
+          $ref: '#/components/schemas/LoginVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
+
+    ResultTokenRefreshVo:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: Success
+        data:
+          $ref: '#/components/schemas/TokenRefreshVo'
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
+
+    ResultMerchantApply:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: 商家入驻申请已提交
+        data:
+          $ref: '#/components/schemas/MerchantApplyResultData'
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
+
+    ValidationErrorResult:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: 参数校验失败
+        data:
+          type: object
+          description: 字段级校验错误，key 保持后端原始字段名
+          additionalProperties:
+            type: string
+          example:
+            merchantName: 商户名称不能为空
+            imageUrl: 商家图片不能为空
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
+
+    AppErrorResult:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 409
+        message:
+          type: string
+          example: 业务异常
+        data:
+          type: object
+          description: 业务异常附加信息，必含 `errorType`
+          additionalProperties: true
+          example:
+            errorType: USER_REGISTER_CONFLICT
+            field: username
+            value: alice_pet
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}
+
+    SecurityErrorResult:
+      type: object
+      required:
+        - code
+        - message
+        - metadata
+      properties:
+        code:
+          type: integer
+          example: 401
+        message:
+          type: string
+          example: 未登录或登录已失效
+        metadata:
+          type: object
+          additionalProperties: true
+          example: {}

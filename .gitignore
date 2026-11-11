@@ -32,7 +32,7 @@ pnpm-debug.log*
 
 # Secrets
 *.pub
-JPet_Store/xk1125yq0830
+JPet_Store/xk*
 *.pem
 *.key
 *.p12
